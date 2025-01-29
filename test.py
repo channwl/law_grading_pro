@@ -254,10 +254,12 @@ def main():
 
             if dataframes:
                 merged_df = pd.concat(dataframes, ignore_index=True)
+
+                # 중복된 학생번호 제거 (최신 데이터 유지)
                 merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
 
                 # ✅ csv_data와 병합
-                if csv_data:
+                if csv_data:  # csv_data가 비어있지 않은 경우만 병합
                     csv_df = pd.DataFrame(csv_data)
                     merged_df = pd.concat([merged_df, csv_df], ignore_index=True)
                     merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
