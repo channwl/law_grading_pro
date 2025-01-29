@@ -269,8 +269,8 @@ def main():
 
         if uploaded_csvs:
             merged_df = merge_uploaded_csvs(uploaded_csvs)
-            st.sidebar.subheader("📊 병합된 채점 결과")
-            st.sidebar.write(merged_df)
+            st.subheader("📊 병합된 채점 결과")
+            st.write(merged_df)
 
             st.sidebar.download_button(
                 label="📥 병합된 채점 결과 CSV 다운로드",
