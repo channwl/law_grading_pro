@@ -141,23 +141,23 @@ def clear_uploaded_files():
     st.write('<meta http-equiv="refresh" content="0; url=/" />', unsafe_allow_html=True)
 
 def merge_uploaded_csvs(uploaded_files):
-"""CSV 파일을 학생번호 기준으로 병합하고 총점을 계산하는 함수"""
-dataframes = [pd.read_csv(file) for file in uploaded_files]
+    """CSV 파일을 학생번호 기준으로 병합하고 총점을 계산하는 함수"""
+    dataframes = [pd.read_csv(file) for file in uploaded_files]
 
-# 학생번호 기준으로 병합
-merged_df = dataframes[0]
-for df in dataframes[1:]:
-    merged_df = merged_df.merge(df, on="학생번호", how="outer")
+    # 학생번호 기준으로 병합
+    merged_df = dataframes[0]
+    for df in dataframes[1:]:
+        merged_df = merged_df.merge(df, on="학생번호", how="outer")
 
-# NaN 값을 0으로 변환 후 총점 계산
-score_columns = [col for col in merged_df.columns if col.startswith("문제")]
-merged_df["총점"] = merged_df[score_columns].fillna(0).sum(axis=1)
+    # NaN 값을 0으로 변환 후 총점 계산
+    score_columns = [col for col in merged_df.columns if col.startswith("문제")]
+    merged_df["총점"] = merged_df[score_columns].fillna(0).sum(axis=1)
 
-# 총점을 맨 왼쪽으로 이동
-column_order = ["총점", "학생번호"] + score_columns
-merged_df = merged_df[column_order]
+    # 총점을 맨 왼쪽으로 이동
+    column_order = ["총점", "학생번호"] + score_columns
+    merged_df = merged_df[column_order]
 
-return merged_df
+    return merged_df
 
 def convert_df_to_csv(df):
     """DataFrame을 CSV 파일로 변환"""
