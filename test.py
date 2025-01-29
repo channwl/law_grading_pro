@@ -8,7 +8,7 @@ from pdfminer.high_level import extract_text
 import re
 import os
 import subprocess
-
+from io import BytesIO
 import os
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -239,46 +239,61 @@ def main():
                     mime="text/csv"
                 )
 
-        # csv_data가 정의되지 않았을 경우를 대비해 빈 리스트로 초기화
-        csv_data = []
+        # 사이드바 생성
+        st.sidebar.subheader("📂 CSV 파일을 업로드하세요")
+        uploaded_files = st.sidebar.file_uploader("CSV 파일을 선택하세요", type="csv", accept_multiple_files=True)
 
-        if uploaded_csv_files:
-            dataframes = []
-
-            for uploaded_csv in uploaded_csv_files:
-                try:
-                    df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
-                    dataframes.append(df)
-                except Exception as e:
-                    st.sidebar.error(f"파일 {uploaded_csv.name}을(를) 읽는 중 오류 발생: {e}")
-
-            if dataframes:
-                merged_df = pd.concat(dataframes, ignore_index=True)
-
-                # 중복된 학생번호 제거 (최신 데이터 유지)
-                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
-
-                # ✅ csv_data와 병합
-                if csv_data:  # csv_data가 비어있지 않은 경우만 병합
-                    csv_df = pd.DataFrame(csv_data)
-                    merged_df = pd.concat([merged_df, csv_df], ignore_index=True)
-                    merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
-
-                merged_csv_file = "merged_grading_results.csv"
-                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
-
-                st.sidebar.success("✅ CSV 파일이 성공적으로 병합되었습니다!")
-                st.sidebar.download_button(
-                    label="📥 병합된 CSV 다운로드",
-                    data=open(merged_csv_file, "rb"),
-                    file_name="merged_grading_results.csv",
-                    mime="text/csv"
-                )
-
-                import ace_tools as ace
-                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
-            else:
-                st.sidebar.warning("업로드된 CSV 파일을 읽을 수 없습니다.") 
+        # 파일이 1개 이상 업로드되었을 때만 처리
+        if uploaded_files:
+            try:
+                dataframes = []
+                expected_columns = {"학생번호", "총점"}
+                
+                for uploaded_file in uploaded_files:
+                    df = pd.read_csv(uploaded_file)
+                    
+                    # 컬럼 검증
+                    if set(df.columns) == expected_columns:
+                        df.rename(columns={"학생번호": "Student ID", "총점": f"Score{len(dataframes) + 1}"}, inplace=True)
+                        dataframes.append(df)
+                    else:
+                        st.sidebar.error(f"❌ 파일 {uploaded_file.name}의 컬럼명이 올바르지 않습니다. ['학생번호', '총점'] 컬럼이 필요합니다.")
+                        break
+                
+                if dataframes:
+                    # 데이터 병합
+                    merged_df = dataframes[0]
+                    for df in dataframes[1:]:
+                        merged_df = merged_df.merge(df, on="Student ID", how="outer")
+                    
+                    # 총점 계산 (NaN 값은 0으로 변환 후 합산)
+                    score_columns = [col for col in merged_df.columns if col.startswith("Score")]
+                    merged_df["Total Score"] = merged_df[score_columns].fillna(0).sum(axis=1)
+                    
+                    # 결과 미리보기
+                    st.subheader("🔍 병합된 데이터 미리보기")
+                    st.write(merged_df.head())
+                    
+                    # CSV 변환 함수
+                    def convert_df_to_csv(df):
+                        output = BytesIO()
+                        df.to_csv(output, index=False, encoding="utf-8-sig")
+                        processed_data = output.getvalue()
+                        return processed_data
+                    
+                    # 다운로드 버튼 추가 (사이드바)
+                    st.sidebar.subheader("📥 변환된 CSV 파일 다운로드")
+                    st.sidebar.download_button(
+                        label="💾 CSV 파일 다운로드",
+                        data=convert_df_to_csv(merged_df),
+                        file_name="merged_grading_results.csv",
+                        mime="text/csv",
+                    )
+                
+            except Exception as e:
+                st.sidebar.error(f"⚠️ 오류 발생: {e}")
+        else:
+            st.sidebar.info("⏳ CSV 파일을 업로드하면 데이터가 병합됩니다.") 
         
 
     with col2:
