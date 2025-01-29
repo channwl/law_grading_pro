@@ -45,63 +45,7 @@ def parse_scores(result_text, question_count):
     
     return scores
 
-def get_grading_prompt(question_count):
-    """Return appropriate prompts based on number of questions"""
-    system_prompt = """
-    당신은 법학 서술형 답안을 채점하는 엄격하고 공정한 채점관입니다.
-    모든 채점 기준을 세밀하게 검토하고, 채점 기준에 따른 충족 여부를 명확하게 판단하세요.
-    - 문제가 모호할 경우 항상 보수적으로 판단하고, 학생이 명확히 설명하지 못한 부분은 감점하세요.
-    - 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-    - 채점 기준을 하나씩 다 나눠서 채점해주세요.
-    - 점수 부여 시 근거를 명확하게 확인해주세요.
-    """
 
-    if question_count == 1:
-        user_prompt_template = """
-        채점 기준:
-        {guideline}
-
-        학생 답안:
-        {answer}
-
-        위 정보를 바탕으로:
-        1. 채점 기준에 따라 학생 답안이 얼마나 충족되었는지 평가하세요.
-        2. 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-        3. 채점 기준을 하나씩 다 나눠서 채점해주세요.
-        4. 점수를 부여하고 근거를 명확히 설명해주세요.
-        5. 점수는 정수로 나타내주세요.
-
-        출력 형식은 아래와 같습니다:
-        - 근거 :
-        - 총점 : [숫자]
-        """
-    else:
-        user_prompt_template = """
-        채점 기준:
-        {guideline}
-
-        학생 답안:
-        {answer}
-
-        위 정보를 바탕으로:
-        1. 각 문제(예: 2-1, 2-2)별로 나눠서 채점해주세요.
-        2. 각 채점 기준에 따라 학생 답안이 얼마나 충족되었는지 평가하세요.
-        3. 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-        4. 채점 기준을 하나씩 다 나눠서 채점해주세요.
-        5. 각 문제별 점수를 명시해주세요.
-        6. 점수는 정수로 나타내주세요.
-
-        출력 형식은 아래와 같습니다:
-        문제 2-1
-        - 근거 :
-        - 문제 2-1 총점 : [숫자]
-
-        문제 2-2
-        - 근거 :
-        - 문제 2-2 총점 : [숫자]
-        """
-    
-    return system_prompt, user_prompt_template
 
 def get_grading_prompt(question_count):
     """Return appropriate prompts based on number of questions"""
@@ -295,27 +239,33 @@ def main():
                     mime="text/csv"
                 )
 
-        # 기존 CSV 업로드 및 병합 기능 추가
-        st.sidebar.subheader("📂 기존 채점 결과 합치기")
+        # csv_data가 정의되지 않았을 경우를 대비해 빈 리스트로 초기화
+        csv_data = []
 
-        uploaded_csv = st.sidebar.file_uploader("기존 채점 결과 CSV 파일을 업로드하세요", type=["csv"], key="uploaded_csv")
+        if uploaded_csv_files:
+            dataframes = []
 
-        if uploaded_csv is not None:
-            existing_df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
-            
-            # 새로 생성된 채점 결과 CSV 파일과 병합
-            if csv_data:
-                new_df = pd.DataFrame(csv_data)
-                merged_df = pd.concat([existing_df, new_df], ignore_index=True)
-                
-                # 중복된 학생번호 제거 (최신 데이터 유지)
+            for uploaded_csv in uploaded_csv_files:
+                try:
+                    df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
+                    dataframes.append(df)
+                except Exception as e:
+                    st.sidebar.error(f"파일 {uploaded_csv.name}을(를) 읽는 중 오류 발생: {e}")
+
+            if dataframes:
+                merged_df = pd.concat(dataframes, ignore_index=True)
                 merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
 
-                # 병합된 파일 다운로드 버튼 추가
+                # ✅ csv_data와 병합
+                if csv_data:
+                    csv_df = pd.DataFrame(csv_data)
+                    merged_df = pd.concat([merged_df, csv_df], ignore_index=True)
+                    merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
+
                 merged_csv_file = "merged_grading_results.csv"
                 merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
-                
-                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
+
+                st.sidebar.success("✅ CSV 파일이 성공적으로 병합되었습니다!")
                 st.sidebar.download_button(
                     label="📥 병합된 CSV 다운로드",
                     data=open(merged_csv_file, "rb"),
@@ -323,13 +273,11 @@ def main():
                     mime="text/csv"
                 )
 
-                # 병합된 결과를 데이터프레임으로 표시
-                st.subheader("📊 병합된 채점 결과 미리보기")
                 import ace_tools as ace
                 ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
-
             else:
-                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
+                st.sidebar.warning("업로드된 CSV 파일을 읽을 수 없습니다.") 
+        
 
     with col2:
         st.header("📊 채점 결과")
