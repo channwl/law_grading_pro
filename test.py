@@ -261,12 +261,12 @@ def main():
                         break
                 
                 if dataframes:
-                    # 데이터 병합
+                    # 데이터 병합 (학생번호 기준으로 옆으로 합치기)
                     merged_df = dataframes[0]
                     for df in dataframes[1:]:
                         merged_df = merged_df.merge(df, on="Student ID", how="outer")
                     
-                    # 총점 계산 (NaN 값은 0으로 변환 후 합산)
+                    # NaN 값 0으로 변환 후 총점 계산
                     score_columns = [col for col in merged_df.columns if col.startswith("Score")]
                     merged_df["Total Score"] = merged_df[score_columns].fillna(0).sum(axis=1)
                     
@@ -293,8 +293,7 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"⚠️ 오류 발생: {e}")
         else:
-            st.sidebar.info("⏳ CSV 파일을 업로드하면 데이터가 병합됩니다.") 
-        
+            st.sidebar.info("⏳ CSV 파일을 업로드하면 학생번호 기준으로 데이터가 병합됩니다.")
 
     with col2:
         st.header("📊 채점 결과")
