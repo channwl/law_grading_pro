@@ -249,12 +249,12 @@ def main():
                 dataframes = []
                 expected_columns = {"학생번호", "총점"}
                 
-                for uploaded_file in uploaded_files:
+                for i, uploaded_file in enumerate(uploaded_files, start=1):
                     df = pd.read_csv(uploaded_file)
                     
                     # 컬럼 검증
                     if set(df.columns) == expected_columns:
-                        df.rename(columns={"학생번호": "Student ID", "총점": f"Score{len(dataframes) + 1}"}, inplace=True)
+                        df.rename(columns={"학생번호": "Student ID", "총점": f"문제{i}"}, inplace=True)
                         dataframes.append(df)
                     else:
                         st.sidebar.error(f"❌ 파일 {uploaded_file.name}의 컬럼명이 올바르지 않습니다. ['학생번호', '총점'] 컬럼이 필요합니다.")
@@ -267,8 +267,12 @@ def main():
                         merged_df = merged_df.merge(df, on="Student ID", how="outer")
                     
                     # NaN 값 0으로 변환 후 총점 계산
-                    score_columns = [col for col in merged_df.columns if col.startswith("Score")]
-                    merged_df["Total Score"] = merged_df[score_columns].fillna(0).sum(axis=1)
+                    score_columns = [col for col in merged_df.columns if col.startswith("문제")]
+                    merged_df["총점"] = merged_df[score_columns].fillna(0).sum(axis=1)
+                    
+                    # 총점을 맨 왼쪽으로 이동
+                    column_order = ["총점", "Student ID"] + score_columns
+                    merged_df = merged_df[column_order]
                     
                     # 결과 미리보기
                     st.subheader("🔍 병합된 데이터 미리보기")
