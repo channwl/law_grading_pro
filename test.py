@@ -130,8 +130,9 @@ def get_grading_prompt(question_count):
         5. 점수는 정수로 나타내주세요.
 
         출력 형식은 아래와 같습니다:
+        문제 1
         - 근거 :
-        - 총점 : [숫자]
+        - 문제 1 총점 : [숫자]
         """
     else:
         user_prompt_template = """
@@ -293,6 +294,42 @@ def main():
                     file_name="grading_results.csv",
                     mime="text/csv"
                 )
+
+        # 기존 CSV 업로드 및 병합 기능 추가
+        st.sidebar.subheader("📂 기존 채점 결과 합치기")
+
+        uploaded_csv = st.sidebar.file_uploader("기존 채점 결과 CSV 파일을 업로드하세요", type=["csv"], key="uploaded_csv")
+
+        if uploaded_csv is not None:
+            existing_df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
+            
+            # 새로 생성된 채점 결과 CSV 파일과 병합
+            if csv_data:
+                new_df = pd.DataFrame(csv_data)
+                merged_df = pd.concat([existing_df, new_df], ignore_index=True)
+                
+                # 중복된 학생번호 제거 (최신 데이터 유지)
+                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
+
+                # 병합된 파일 다운로드 버튼 추가
+                merged_csv_file = "merged_grading_results.csv"
+                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
+                
+                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
+                st.sidebar.download_button(
+                    label="📥 병합된 CSV 다운로드",
+                    data=open(merged_csv_file, "rb"),
+                    file_name="merged_grading_results.csv",
+                    mime="text/csv"
+                )
+
+                # 병합된 결과를 데이터프레임으로 표시
+                st.subheader("📊 병합된 채점 결과 미리보기")
+                import ace_tools as ace
+                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
+
+            else:
+                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
 
     with col2:
         st.header("📊 채점 결과")
