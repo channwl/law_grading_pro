@@ -162,37 +162,27 @@ def get_grading_prompt(question_count):
     return system_prompt, user_prompt_template
 
 def grade_with_openai(guideline, answer, question_count):
-    """Grade answers using OpenAI API with automatic retries"""
+    """Grade answers using OpenAI API with appropriate prompts"""
     system_prompt, user_prompt_template = get_grading_prompt(question_count)
 
+    # Format user prompt
     user_prompt = user_prompt_template.format(
         guideline=guideline,
         answer=answer
     )
 
-    max_retries = 5  # Maximum retry attempts
-    delay = 2  # Initial delay in seconds
+    # API call
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",  # Using gpt-4o as requested
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+            ],
+            temperature=0,
+    )
 
-    for attempt in range(max_retries):
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0,
-            )
-            return response["choices"][0]["message"]["content"].strip()
-
-        except openai.error.RateLimitError:
-            if attempt < max_retries - 1:
-                wait_time = delay * (2 ** attempt)  # Exponential backoff
-                st.warning(f"⚠️ API 제한 초과: {wait_time}초 후 재시도 ({attempt + 1}/{max_retries})")
-                time.sleep(wait_time)
-            else:
-                st.error("🚨 API 요청이 계속 실패했습니다. 나중에 다시 시도하세요.")
-                return "채점 실패: API 제한 초과"
+    # Return the response content
+    return response["choices"][0]["message"]["content"].strip()
 
 def clear_uploaded_files():
     """Clear all uploaded files and reset the session state."""
@@ -303,42 +293,6 @@ def main():
                     file_name="grading_results.csv",
                     mime="text/csv"
                 )
-        
-        # 기존 CSV 업로드 및 병합 기능 추가
-        st.sidebar.subheader("📂 기존 채점 결과 합치기")
-
-        uploaded_csv = st.sidebar.file_uploader("기존 채점 결과 CSV 파일을 업로드하세요", type=["csv"], key="uploaded_csv")
-
-        if uploaded_csv is not None:
-            existing_df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
-            
-            # 새로 생성된 채점 결과 CSV 파일과 병합
-            if csv_data:
-                new_df = pd.DataFrame(csv_data)
-                merged_df = pd.concat([existing_df, new_df], ignore_index=True)
-                
-                # 중복된 학생번호 제거 (최신 데이터 유지)
-                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
-
-                # 병합된 파일 다운로드 버튼 추가
-                merged_csv_file = "merged_grading_results.csv"
-                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
-                
-                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
-                st.sidebar.download_button(
-                    label="📥 병합된 CSV 다운로드",
-                    data=open(merged_csv_file, "rb"),
-                    file_name="merged_grading_results.csv",
-                    mime="text/csv"
-                )
-
-                # 병합된 결과를 데이터프레임으로 표시
-                st.subheader("📊 병합된 채점 결과 미리보기")
-                import ace_tools as ace
-                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
-
-            else:
-                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
 
     with col2:
         st.header("📊 채점 결과")
