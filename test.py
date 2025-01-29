@@ -27,22 +27,17 @@ def extract_text_from_pdf(file):
     return structured_sections
 
 def parse_scores(result_text, question_count):
-    """Parse scores based on the number of questions"""
     scores = {}
-    
     if question_count == 1:
-        # Single question format
         total_match = re.search(r"총점\s*:\s*(\d+)", result_text)
         if total_match:
-            scores["총점"] = int(total_match.group(1))
+            scores["문제1"] = int(total_match.group(1))  # '총점'을 '문제1'로 변경
     else:
-        # Multiple questions format
         question_scores = re.finditer(r"문제\s*(\d+-\d+)\s*총점\s*:\s*(\d+)", result_text)
         for match in question_scores:
             question_num = match.group(1)
             score = int(match.group(2))
             scores[f"문제{question_num}"] = score
-    
     return scores
 
 
@@ -107,26 +102,14 @@ def get_grading_prompt(question_count):
     return system_prompt, user_prompt_template
 
 def grade_with_openai(guideline, answer, question_count):
-    """Grade answers using OpenAI API with appropriate prompts"""
     system_prompt, user_prompt_template = get_grading_prompt(question_count)
-
-    # Format user prompt
-    user_prompt = user_prompt_template.format(
-        guideline=guideline,
-        answer=answer
-    )
-
-    # API call
+    user_prompt = user_prompt_template.format(guideline=guideline, answer=answer)
     response = openai.ChatCompletion.create(
-        model="gpt-4o",  # Using gpt-4o as requested
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-            ],
-            temperature=0,
+        model="gpt-4o",
+        messages=[{"role": "system", "content": system_prompt},
+                  {"role": "user", "content": user_prompt}],
+        temperature=0,
     )
-
-    # Return the response content
     return response["choices"][0]["message"]["content"].strip()
 
 def clear_uploaded_files():
