@@ -162,27 +162,37 @@ def get_grading_prompt(question_count):
     return system_prompt, user_prompt_template
 
 def grade_with_openai(guideline, answer, question_count):
-    """Grade answers using OpenAI API with appropriate prompts"""
+    """Grade answers using OpenAI API with automatic retries"""
     system_prompt, user_prompt_template = get_grading_prompt(question_count)
 
-    # Format user prompt
     user_prompt = user_prompt_template.format(
         guideline=guideline,
         answer=answer
     )
 
-    # API call
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",  # Using gpt-4o as requested
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-            ],
-            temperature=0,
-    )
+    max_retries = 5  # Maximum retry attempts
+    delay = 2  # Initial delay in seconds
 
-    # Return the response content
-    return response["choices"][0]["message"]["content"].strip()
+    for attempt in range(max_retries):
+        try:
+            response = openai.ChatCompletion.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0,
+            )
+            return response["choices"][0]["message"]["content"].strip()
+
+        except openai.error.RateLimitError:
+            if attempt < max_retries - 1:
+                wait_time = delay * (2 ** attempt)  # Exponential backoff
+                st.warning(f"⚠️ API 제한 초과: {wait_time}초 후 재시도 ({attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                st.error("🚨 API 요청이 계속 실패했습니다. 나중에 다시 시도하세요.")
+                return "채점 실패: API 제한 초과"
 
 def clear_uploaded_files():
     """Clear all uploaded files and reset the session state."""
